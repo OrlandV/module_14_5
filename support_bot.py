@@ -1,7 +1,7 @@
 from aiogram import Bot, Dispatcher, executor, types
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram.dispatcher.filters.state import State, StatesGroup
-from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
+from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 import asyncio
 
 api = '7482210268:AAGOAnag6efrx0AqqKfVvlm-T3LeSLKXxB4'
@@ -9,8 +9,12 @@ bot = Bot(token=api)
 dp = Dispatcher(bot, storage=MemoryStorage())
 but_calc = KeyboardButton('Рассчитать')
 but_info = KeyboardButton('Информация')
-kb = ReplyKeyboardMarkup(resize_keyboard=True)
-kb.row(but_calc, but_info)
+rkb = ReplyKeyboardMarkup(resize_keyboard=True)
+rkb.row(but_calc, but_info)
+ikb = InlineKeyboardMarkup(inline_keyboard=[[
+    InlineKeyboardButton('Рассчитать норму калорий', callback_data='calories'),
+    InlineKeyboardButton('Формулы расчёта', callback_data='formulas')
+]], resize_keyboard=True)
 
 
 class UserState(StatesGroup):
@@ -25,24 +29,36 @@ async def get_info(message):
     info = ('Программа расчёта количества килокалорий в сутки для Вас.\n'
             'Используется упрощённая формула Миффлина-Сан Жеора.\n'
             'Ограничения:\nвозраст — 13–80 лет,\nрост — от 140 см,\nвес — от 40 кг.')
-    await message.answer(info, reply_markup=kb)
+    await message.answer(info, reply_markup=rkb)
 
 
 @dp.message_handler(commands=['start'])
 async def start(message):
-    await message.answer('Привет! Я бот помогающий твоему здоровью.', reply_markup=kb)
+    await message.answer('Привет! Я бот помогающий твоему здоровью.', reply_markup=rkb)
 
 
 @dp.message_handler(text='Рассчитать')
-async def set_age(message):
-    await message.answer('Введите свой возраст:')
+async def main_menu(message):
+    await message.answer('Выберите опцию:', reply_markup=ikb)
+
+
+@dp.callback_query_handler(text='formulas')
+async def get_formulas(call):
+    await call.message.answer('Для мужчин: 10 * вес (кг) + 6.25 * рост (см) - 5 * возраст (г) + 5\n'
+                              'Для женщин: 10 * вес (кг) + 6.25 * рост (см) - 5 * возраст (г) - 161')
+    # await call.answer()
+
+
+@dp.callback_query_handler(text='calories')
+async def set_age(call):
+    await call.message.answer('Введите свой возраст:')
     await UserState.age.set()
 
 
 @dp.message_handler(state=UserState.age)
 async def set_growth(message, state):
     try:
-        if int(message.text) < 13:
+        if int(message.text) < 13 or int(message.text) > 80:
             raise ValueError()
     except ValueError:
         await message.answer('Ошибка! Формула применима для лиц в возрасте от 13 до 80 лет.\nВведите свой возраст:')

@@ -7,14 +7,18 @@ import asyncio
 api = '7482210268:AAGOAnag6efrx0AqqKfVvlm-T3LeSLKXxB4'
 bot = Bot(token=api)
 dp = Dispatcher(bot, storage=MemoryStorage())
-but_calc = KeyboardButton('Рассчитать')
-but_info = KeyboardButton('Информация')
-rkb = ReplyKeyboardMarkup(resize_keyboard=True)
-rkb.row(but_calc, but_info)
-ikb = InlineKeyboardMarkup(inline_keyboard=[[
+rkb = ReplyKeyboardMarkup([[
+    KeyboardButton('Рассчитать'),
+    KeyboardButton('Информация'),
+    KeyboardButton('Купить')
+]], resize_keyboard=True)
+ikb_calories = InlineKeyboardMarkup(inline_keyboard=[[
     InlineKeyboardButton('Рассчитать норму калорий', callback_data='calories'),
     InlineKeyboardButton('Формулы расчёта', callback_data='formulas')
 ]], resize_keyboard=True)
+ikb_products = InlineKeyboardMarkup(inline_keyboard=[
+    [InlineKeyboardButton(f'Продукт {i}', callback_data='product_buying') for i in range(1, 5)]
+], resize_keyboard=True)
 
 
 class UserState(StatesGroup):
@@ -39,20 +43,21 @@ async def start(message):
 
 @dp.message_handler(text='Рассчитать')
 async def main_menu(message):
-    await message.answer('Выберите опцию:', reply_markup=ikb)
+    await message.answer('Выберите опцию:', reply_markup=ikb_calories)
 
 
 @dp.callback_query_handler(text='formulas')
 async def get_formulas(call):
     await call.message.answer('Для мужчин: 10 * вес (кг) + 6.25 * рост (см) - 5 * возраст (г) + 5\n'
                               'Для женщин: 10 * вес (кг) + 6.25 * рост (см) - 5 * возраст (г) - 161')
-    # await call.answer()
+    await call.answer()
 
 
 @dp.callback_query_handler(text='calories')
 async def set_age(call):
     await call.message.answer('Введите свой возраст:')
     await UserState.age.set()
+    await call.answer()
 
 
 @dp.message_handler(state=UserState.age)
@@ -115,6 +120,21 @@ async def send_calories(message, state):
         result = 10 * int(data['weight']) + 6.25 * int(data['growth']) - 5 * int(data['age']) + rg
         await message.answer(f'Количество килокалорий в сутки для Вас: {result}')
         await state.finish()
+
+
+@dp.message_handler(text='Купить')
+async def get_buying_list(message):
+    for i in range(1, 5):
+        await message.answer(f'Название: Продукт {i} | Описание: описание {i} | Цена: {i * 100}')
+        with open(f'img/{i}.jpg', 'rb') as img:
+            await message.answer_photo(img)
+    await message.answer('Выберите продукт для покупки:', reply_markup=ikb_products)
+
+
+@dp.callback_query_handler(text='product_buying')
+async def send_confirm_message(call):
+    await call.message.answer('Вы успешно приобрели продукт!')
+    await call.answer()
 
 
 @dp.message_handler()

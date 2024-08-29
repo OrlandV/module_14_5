@@ -2,9 +2,11 @@ from aiogram import Bot, Dispatcher, executor, types
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram.dispatcher.filters.state import State, StatesGroup
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
+from crud_functions import *
 import asyncio
 
 api = '7482210268:AAGOAnag6efrx0AqqKfVvlm-T3LeSLKXxB4'
+products = get_all_products()
 bot = Bot(token=api)
 dp = Dispatcher(bot, storage=MemoryStorage())
 rkb = ReplyKeyboardMarkup([[
@@ -17,7 +19,7 @@ ikb_calories = InlineKeyboardMarkup(inline_keyboard=[[
     InlineKeyboardButton('Формулы расчёта', callback_data='formulas')
 ]], resize_keyboard=True)
 ikb_products = InlineKeyboardMarkup(inline_keyboard=[
-    [InlineKeyboardButton(f'Продукт {i}', callback_data='product_buying') for i in range(1, 5)]
+    [InlineKeyboardButton(product[1], callback_data='product_buying') for product in products]
 ], resize_keyboard=True)
 
 
@@ -124,9 +126,9 @@ async def send_calories(message, state):
 
 @dp.message_handler(text='Купить')
 async def get_buying_list(message):
-    for i in range(1, 5):
-        await message.answer(f'Название: Продукт {i} | Описание: описание {i} | Цена: {i * 100}')
-        with open(f'img/{i}.jpg', 'rb') as img:
+    for product in products:
+        await message.answer(f'Название: {product[1]} | Описание: {product[2]} | Цена: {product[3]}')
+        with open(f'img/{product[0]}.jpg', 'rb') as img:
             await message.answer_photo(img)
     await message.answer('Выберите продукт для покупки:', reply_markup=ikb_products)
 

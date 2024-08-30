@@ -5,15 +5,20 @@ from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMar
 from crud_functions import *
 import asyncio
 
+ENG_ALPHA = [chr(i) for i in range(65, 91)] + [chr(i) for i in range(97, 123)]
 api = '7482210268:AAGOAnag6efrx0AqqKfVvlm-T3LeSLKXxB4'
 products = get_all_products()
 bot = Bot(token=api)
 dp = Dispatcher(bot, storage=MemoryStorage())
-rkb = ReplyKeyboardMarkup([[
-    KeyboardButton('Рассчитать'),
-    KeyboardButton('Информация'),
-    KeyboardButton('Купить')
-]], resize_keyboard=True)
+rkb = ReplyKeyboardMarkup([
+    [
+        KeyboardButton('Рассчитать'),
+        KeyboardButton('Информация')
+    ], [
+        KeyboardButton('Купить'),
+        KeyboardButton('Регистрация')
+    ]
+], resize_keyboard=True)
 ikb_calories = InlineKeyboardMarkup(inline_keyboard=[[
     InlineKeyboardButton('Рассчитать норму калорий', callback_data='calories'),
     InlineKeyboardButton('Формулы расчёта', callback_data='formulas')
@@ -28,6 +33,13 @@ class UserState(StatesGroup):
     growth = State()
     weight = State()
     gender = State()
+
+
+class RegistrationState(StatesGroup):
+    username = State()
+    email = State()
+    age = State()
+    balance = State()
 
 
 @dp.message_handler(text='Информация')
@@ -106,22 +118,19 @@ async def send_gender(message, state):
 
 @dp.message_handler(state=UserState.gender)
 async def send_calories(message, state):
-    await state.update_data(gender=message.text)
-    data = await state.get_data()
-    try:
-        if data['gender'].upper() == 'М':
-            rg = 5
-        elif data['gender'].upper() == 'Ж':
-            rg = -161
-        else:
-            raise ValueError()
-    except ValueError:
+    if message.text.upper() == 'М':
+        rg = 5
+    elif message.text.upper() == 'Ж':
+        rg = -161
+    else:
         await message.answer('Ошибка!\nВведите свой пол (М / Ж):')
         await UserState.gender.set()
-    else:
-        result = 10 * int(data['weight']) + 6.25 * int(data['growth']) - 5 * int(data['age']) + rg
-        await message.answer(f'Количество килокалорий в сутки для Вас: {result}')
-        await state.finish()
+        return
+    await state.update_data(gender=message.text)
+    data = await state.get_data()
+    result = 10 * int(data['weight']) + 6.25 * int(data['growth']) - 5 * int(data['age']) + rg
+    await message.answer(f'Количество килокалорий в сутки для Вас: {result}')
+    await state.finish()
 
 
 @dp.message_handler(text='Купить')
@@ -137,6 +146,60 @@ async def get_buying_list(message):
 async def send_confirm_message(call):
     await call.message.answer('Вы успешно приобрели продукт!')
     await call.answer()
+
+
+@dp.message_handler(text='Регистрация')
+async def sing_up(message):
+    await message.answer('Введите имя пользователя (только латинский алфавит):')
+    await RegistrationState.username.set()
+
+
+def is_eng_alpha(text):
+    if not isinstance(text, str):
+        return False
+    for a in text:
+        if a not in ENG_ALPHA:
+            return False
+    return True
+
+
+@dp.message_handler(state=RegistrationState.username)
+async def set_username(message, state):
+    if not is_eng_alpha(message.text):
+        await message.answer('Введите имя пользователя (только латинский алфавит):')
+        await RegistrationState.username.set()
+    elif is_included(message.text):
+        await message.answer(f'Пользователь {message.text} существует. Введите другое имя (только латинский алфавит):')
+        await RegistrationState.username.set()
+    else:
+        await state.update_data(username=message.text)
+        await message.answer('Введите свой email:')
+        await RegistrationState.email.set()
+
+
+@dp.message_handler(state=RegistrationState.email)
+async def set_email(message, state):
+    await state.update_data(email=message.text)
+    await message.answer('Введите свой возраст:')
+    await RegistrationState.age.set()
+
+
+@dp.message_handler(state=RegistrationState.age)
+async def set_age(message, state):
+    try:
+        if int(message.text) < 18:
+            await message.answer('Извините, но нашими покупателями могут быть только лица, достигшие возраста 18 лет.')
+            await state.finish()
+            return
+    except ValueError:
+        await message.answer('Ошибка ввода: ожидается число.\nВведите свой возраст:')
+        await RegistrationState.age.set()
+    else:
+        await state.update_data(age=message.text)
+        data = await state.get_data()
+        add_user(data['username'], data['email'], data['age'])
+        await message.answer('Регистрация прошла успешно.')
+        await state.finish()
 
 
 @dp.message_handler()

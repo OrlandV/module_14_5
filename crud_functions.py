@@ -17,6 +17,18 @@ def __add_products():
     # connection.commit()
 
 
+def add_user(username, email, age, balance=1000):
+    cursor.execute(
+        f"INSERT INTO Users (username, email, age, balance) VALUES ('{username}', '{email}', {age}, {balance})"
+    )
+    connection.commit()
+
+
+def is_included(username):
+    count = cursor.execute(f"SELECT COUNT(*) FROM Users WHERE username = '{username}'").fetchone()
+    return count[0] > 0
+
+
 def initiate_db():
     cursor.execute('''
 CREATE TABLE IF NOT EXISTS Products(
@@ -24,6 +36,15 @@ CREATE TABLE IF NOT EXISTS Products(
     title TEXT NOT NULL,
     description TEXT,
     price INTEGER NOT NULL
+)
+''')
+    cursor.execute('''
+CREATE TABLE IF NOT EXISTS Users(
+    id INTEGER PRIMARY KEY,
+    username TEXT NOT NULL,
+    email TEXT NOT NULL,
+    age INTEGER NOT NULL,
+    balance INTEGER NOT NULL
 )
 ''')
     if len(get_all_products()) == 0:
